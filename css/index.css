@@ -1,0 +1,27 @@
+#hover-click{
+  position: relative;
+  width: 10%;
+  height: 100%;
+  margin: 0;
+}
+#hover-click > a{
+  display: block;
+  width: 10%;
+  height: 100%;
+  padding: 10px;
+  background: #8bc34a;
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+  text-decoration: none;
+}
+#hover-click > div{
+  display: none;
+  z-index: 9999;
+  position: absolute;
+  width: 10%;
+  height: 100%;
+  padding: 50px 0;
+  background: #dcedc8;
+  text-align: center;
+}
