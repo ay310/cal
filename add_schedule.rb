@@ -12,8 +12,8 @@ e_time = data['e_time'].to_s.toutf8
 title = data['content'].to_s.toutf8
 category = data['category'].to_s.toutf8
 id = data['id'].to_s.toutf8
-ts_time = '00:00' if ts_time == ''
-te_time = '24:00' if te_time == ''
+s_time = '00:00' if s_time == ''
+e_time = '24:00' if e_time == ''
 
 #規定文を作成する時以下を利用する
 search_title = data['s_title'].to_s.toutf8
