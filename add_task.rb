@@ -76,7 +76,7 @@ def update_task(t_id, title, e_day, e_time, tasktime, about, category, star)
   db.execute('update task set category =?  where id=?', category, t_id)
   db.execute('update task set importance =?  where id=?', star, t_id)
   db.close
-  print '<html>\n'
+  print '<html>'
   print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
 end
 
@@ -85,7 +85,7 @@ def add_task(title, e_day, e_time, tasktime, about, category, star)
   db.results_as_hash = true
   db.execute('insert into task  (title, e_time, e_day, t_time, about, category, importance, time, located) values(?, ?, ?, ?, ?, ?, ?, ?, ?)', title, e_time, e_day, tasktime, about, category, star, '00:00', '00:00')
   db.close
-  print '<html>\n'
+  print '<html>'
   print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
 end
 
@@ -207,7 +207,7 @@ def task_scheduler(cal_t_id, cal_s_id, cal_st, cal_et, cal_plan_st, cal_plan_et)
     db.execute('update task set log =?  where id=?', add_log, cal_t_id)
   end
   db.close
-  print '<html>\n'
+  print '<html>'
   print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
 end
 
@@ -254,7 +254,7 @@ else
     db.execute('delete from task where id=?', del_id)
     db.execute('delete from schedule where st=?', del_id)
     db.close
-    print '<html>\n'
+    print '<html>'
     print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
   else
     p 'error'

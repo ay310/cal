@@ -187,18 +187,18 @@ class Locate_events
 
   def decide_s_schedule(day)
     #スケジュールを古い順に並び替えて、今日のスケジュールは
-    #@num_i番目だよと教えてくれるやつ
+    #@num_i+1(0始まり)番目だよと教えてくれるやつ
     read_schedule
     i = 0
     while i < @num.to_i - 1
-      if chint(@s_day[i].to_s).to_i - chint(day.to_s).to_i >= 0
+      if chint(@s_day[i].to_s).to_i - chint(day.to_s).to_i > 0
         @num_i = i
         break
       else
         i += 1
       end
     end
-    # p @num_i
+     #p @num_i
   end
 
 def decide_sday
@@ -217,7 +217,9 @@ end
   def search_same(name, sd, st, ed, et)
     decide_s_schedule(@today)
     overlap = 0
-    for i in@num_i.to_i..@num.to_i - 1
+    #printf("search_same:@num_i=%s",@num_i)
+    for i in@num_i.to_i-1..@num.to_i - 1
+      #printf("件名%s...開始%s,終了%s\n", @title[i],@s_day[i],@e_day[i])
       if @title[i] == name && @s_day[i] == sd && @s_time[i] == st && @e_day[i] == ed && @e_time[i] == et
         overlap = 1
         break
@@ -254,7 +256,7 @@ end
       s_day = day
       e_day = nextday(day)
       if search_same('sleep', s_day, st, e_day, et) == 0
-        db.execute('insert into schedule  (title, s_day, s_time, e_day, e_time, st, completed) values(?, ?, ?, ?, ?, ?, ?)', 'sleep', s_day, st, e_day, et, 's', '0')
+        db.execute('insert into schedule  (title, s_day, s_time, e_day, e_time, st) values(?, ?, ?, ?, ?, ?)', 'sleep', s_day, st, e_day, et, 's')
       end
       day = nextday(day)
     end
@@ -275,18 +277,29 @@ end
     db.close
   end
 
-  def add_db_task(i, s, st, et)
-    #p "call add_db_task"
+  def add_db_task(i, s, st, et, num)
+    #p num
+      #printf("i:%s, s:%s, st:%s, et:%s\n", i, s, st, et)
   	db = SQLite3::Database.new('scheduler.db')
   	db.execute('insert into schedule  (title, s_day, s_time, e_day, e_time, st, completed) values(?, ?, ?, ?, ?, ?, ?)', @t_title[i], @s_day[s], st, @s_day[s], et, @t_id[i], '0')
     if @l_tasktime[i]=="00:00"
-      @l_tasktime[i]=to_h(to_min(et).to_i+to_min(st).to_i)
+      @l_tasktime[i]=to_h(to_min(et).to_i-to_min(st).to_i)
     else
       @l_tasktime[i]=to_h(to_min(@l_tasktime[i]).to_i + (to_min(et).to_i-to_min(st).to_i))
     end
   	db.execute('update task set located = ? where id=?', @l_tasktime[i], @t_id[i])
   	db.close
   	check_tasktime(@t_id[i])
+  end
+
+  def null_task
+    read_task
+    db = SQLite3::Database.new('scheduler.db')
+    for i in 0.. @t_num.to_i-1
+      db.execute('update task set located = ? where id=?', "00:00", @t_id[i])
+    end
+        db.execute('delete from schedule where completed=?', "0")
+    db.close
   end
 
   def put_task
@@ -310,73 +323,86 @@ end
       end
     end
     #タスクiのカテゴリは@c_name[c]である
-    check_tasktime(@t_id[i])
-    #タスクの残り作業時刻の計測
-    #$resttimeが変数
-    printf("day:%s\n",day)
-    printf("endday:%s\n",endday)
-    until day = endday
-      #startday〜enddayまでの間を探す
-      if day >= chint(@s_day[@num.to_i-1]).to_i
-      printf("@s_day@[%d]:%d\n", @num.to_i-1,@s_day[@num.to_i-1].to_i)
-        #スケジュールがendday前に終了した場合
-        #その後の日程の処理
+    for i in 0..@t_num.to_i-1
+      check_tasktime(@t_id[i])
+      #タスクの残り作業時刻の計測
+      #$resttimeが変数
+      #puts i
+      if  $resttime.to_i<=0
+        i=i+1
       else
-        if day > chint(@s_day[s]).to_i
-          #指定日dayが、参照スケジュールsより先の日の場合
-          #参照スケジュールを次のものにする
-          s=s+1
-        elsif day==chint(@s_day[s]).to_i
-          printf("day:%s\n",day)
-         printf("@s_day[%d]:%s\n",s, @s_day[s])
-         #aaaa
-          #i(日)にスケジュール(s)が存在する場合
-          if @e_day[s]==@s_day[s+1]
-            #次にも別の予定が入っている場合
-            bettime=to_min(@e_time[s]).to_i-to_min(@s_time[s+1]).to_i
-            #bettime=sとs+1の間の時間（分）
-            if @c_max[c].to_i<=$resttime.to_i && bettime >=@c_max[c].to_i+20
-              #カテゴリ最大時刻＜残作業時刻
-              #スケジュール間の空き時刻>カテゴリ最大時刻+20
-              st=to_h(to_min(@e_time[s]).to_i+10)
-              et=to_h(to_min(st).to_i+@c_max[c].to_i)
-              add_db_task(i, s, st, et)
-              i=i+1
-              s=s+1
-            elsif @c_min[c].to_i+20<=bettime && bettime<$resttime
-              p "check1-2 OK"
-              #スケジュール間の時刻がタスク可能最小時刻+20より大きく
-              #スケジュール間の時刻が、残タスク作業時刻より大きい場合
-              st=to_h(to_min(@e_time[s]).to_i+10)
-              et=to_h(to_min(@s_time[s+1]).to_i-10)
-              add_db_task(i, s, st, et)
-              i=i+1
-              s=s+1
-            elsif @c_min[c].to_i+20<=bettime && bettime>$resttime+20
-              #スケジュール間の時刻がタスク最小時刻+20より大きい
-              #スケジュール間の時刻が残りタスク時刻より大きい
-              p "check1-3 OK"
-              st=to_h(to_min(@e_time[s]).to_i+10)
-              et=to_h(to_min(st).to_i+$resttime)
-              add_db_task(i, s, st, et)
-            elsif @c_min[c].to_i+20<=bettime
-              st=to_h(to_min(@e_time[s]).to_i+10)
-              et=to_h(to_min(st).to_i+bettime.to_i+10)
-              add_db_task(i, s, st, et)
-              i=i+1
+        #$iのresttimeが0じゃないとき
+        until day == endday
+          if $resttime.to_i==0
+            break
+            #p "break"
+          end
+          if s<@num.to_i-1
+            #スケジュールが終わった場合
+            if chint(day).to_i > chint(@e_day[s]).to_i
               s=s+1
             else
-              day=nextday(day)
+              if @e_day[s]==@s_day[s+1]
+                #puts "スケジュールが同日に２つ以上有る時"
+                bettime=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
+                #printf("resttime:%s, bettime%s\n", $resttime, bettime)
+                if $resttime.to_i+20 < bettime.to_i
+                  if $resttime.to_i+20 < @c_max[c].to_i
+                    st=to_h(to_min(@e_time[s]).to_i+10)
+                    et=to_h(to_min(st).to_i+$resttime)
+                    add_db_task(i, s, st, et, 1)
+                    s=s+1
+                    #printf("resttime:%s",$resttime)
+                    if $resttime.to_i<=0
+                      break
+                    end
+                  else
+                    st=to_h(to_min(@e_time[s]).to_i+10)
+                    et=to_h(to_min(st).to_i+@c_max[c].to_i)
+                    add_db_task(i, s, st, et, 2)
+                    s=s+1
+                  end
+                else
+                  if bettime.to_i > @c_max[c].to_i+20
+                    if $resttime.to_i+20 < @c_max[c].to_i
+                      st=to_h(to_min(@e_time[s]).to_i+10)
+                      et=to_h(to_min(st).to_i+$resttime)
+                      add_db_task(i, s, st, et, 3)
+                      s=s+1
+                    else
+                      st=to_h(to_min(@e_time[s]).to_i+10)
+                      et=to_h(to_min(st).to_i+@c_max[c].to_i)
+                      add_db_task(i, s, st, et, 4)
+                      s=s+1
+                    end
+                  else
+                    if bettime.to_i>@c_min[c].to_i+20
+                      if $resttime.to_i+20 < bettime.to_i
+                        st=to_h(to_min(@e_time[s]).to_i+10)
+                        et=to_h(to_min(st).to_i+$resttime)
+                        add_db_task(i, s, st, et, 5)
+                        s=s+1
+                      else
+                        st=to_h(to_min(@e_time[s]).to_i+10)
+                        et=to_h(to_min(st).to_i+bettime.to_i-20)
+                        add_db_task(i, s, st, et, 6)
+                        s=s+1
+                      end
+                    else
+                      s=s+1
+                    end
+                  end
+                end
+              else
+                #e_day[s]!=s_day[s+1]
+              end
             end
-          else
-            #その日に１つしか予定が入っていない場合
-            #予定後にスケジュールをカテゴリMAX追加
-            #多分ここはありえない
+            else
           end
-        else
-          #i（日）にスケジュール(s)が存在しなかった場合
-          #スケジュールを追加
-          #ここも多分ありえない
+          if $resttime.to_i==0
+            break
+          #  p "break"
+          end
         end
       end
     end
@@ -490,8 +516,9 @@ for i in 0..2
 end
 event.decide_s_schedule(today)
 # event.overlap_event("2015-11-04", "2015-11-04", "15:00", "17:00")
+event.null_task
 event.put_task
-#event.view_event
+event.view_event
 print_t('js2.txt')
 print '</head>'
 print '<body onLoad="sendgps()">'

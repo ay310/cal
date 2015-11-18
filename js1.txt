@@ -34,9 +34,8 @@
 				var accAlt = data.altitudeAccuracy;
 				var heading = data.heading; //0=北,90=東,180=南,270=西
 				var speed = data.speed;
-
 				// アラート表示
-			//	alert("あなたの現在位置は、\n[" + lat + "," + lng + "]\nです。");
+				//alert("あなたの現在位置は、\n[" + lat + "," + lng + "]\nです。");
 
 
        // 位置情報を送信する
@@ -45,7 +44,7 @@
        xmlHttp.open('GET','send_gps.rb?gps='+gps,true);
        xmlHttp.onreadystatechange=function(){ /*小僧が持ってくる動作*/
        if(xmlHttp.readyState==4){
-      			//	alert(gps);
+      				//alert(gps);
       	}
       }
       xmlHttp.send(null);

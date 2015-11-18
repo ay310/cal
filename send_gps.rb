@@ -40,7 +40,7 @@ def same_location(gps)
   lng=location[1]
   lat = lat.split("")
   lng=lng.split("")
-  db = SQLite3::Database.new('/Library/WebServer/CGI-Executables/cal/scheduler.db')
+  db = SQLite3::Database.new('scheduler.db')
   $num=0
   db.execute('select * from location') do |row|
     $num += 1
@@ -85,6 +85,7 @@ def search_schedule(today, t, location_name)
         min[i]=id
       end
     end
+    puts min[to_min(t).to_i]
     if min[to_min(t).to_i]!=0
         db.execute('update schedule set location = ? where id=?', location_name, min[to_min(t).to_i])
     end
@@ -103,7 +104,7 @@ db.close
 location_name=same_location(location)
 search_schedule(today, get_time, location_name)
 
-p add_location,location
+
 
 if location!=""
   if $lastday.to_s==today.to_s && (to_min(get_time).to_i-to_min($lasttime).to_i) <5
@@ -111,6 +112,7 @@ if location!=""
     #p "same"
   else
     #p "not_same"
+    puts "gpsを追加"
     db = SQLite3::Database.new('scheduler.db')
     db.execute('insert into gps  (name, position, day, time) values(?, ?, ?, ?)', location_name, location, today, get_time)
     db.close
