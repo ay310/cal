@@ -11,6 +11,15 @@ location = data['gps']
 #て入力した位置情報から送られてくるやつ
 add_location = data['addlocation']
 d = Time.now
+
+class Array
+  def count
+    k = Hash.new(0)
+    self.each{|x| k[x] += 1 }
+    return k
+  end
+end
+
 def chday(day)
   day = '0' + day.to_s if day.to_s.length == 1
   day
@@ -80,7 +89,7 @@ def same_location(gps)
   end
 
   def add_db_log(s_name, s_category, location_name)
-    if s_name=""
+    if s_name==""
     else
       db = SQLite3::Database.new('scheduler.db')
         db.execute('insert into log(name, location, category, week, time) values(?, ?, ?, ?, ?)', s_name, location_name, s_category, $week, $get_time)
@@ -111,24 +120,93 @@ def search_schedule(today, t, location_name)
           $s_name=row[1].to_s
           $s_category=row[6].to_s
         end
-        #printf("s_category=%s\n", $s_category)
-        db.execute('select * from category where name=?', $s_category) do |row|
-          $c_location=row[1].to_s
-        end
-        #printf("c_location=%s\n", $c_location)
-        if $c_location==""
-          new_location=location_name.to_s
-        else
-          new_location=$c_location.to_s+","+location_name.to_s
-        end
-        #printf("new_location=%s\n", new_location)
-        db.execute('update category set location = ? where name=?', new_location, $s_category)
         add_db_log($s_name, $s_category, location_name)
+        #TABLE:log に　スケジュール名、カテゴリ、位置名、曜日、時刻を追加する
       end
   db.close
 end
 
+def add_db_categorylocation
+  puts "call add_db_categorylocation!\n"
+  db = SQLite3::Database.new('scheduler.db')
+  db.results_as_hash = true
+  #↓カテゴリの個数を取得
+  c_num=0
+  db.execute('select * from category') do |row|
+    c_num=c_num+1
+  end
+  c_name=Array.new(c_num)
+  c_location=Array.new(c_num)
+  i=0
+  #↓配列にカテゴリ名を格納
+  db.execute('select * from category') do |row|
+    c_name[i]=row[0]
+    i=i+1
+  end
+  #↓TABLE:logから特定のカテゴリ名を探す
+  printf("c_num:%s\n", c_num)
+  for j in 1..c_num.to_i-1
+    p j
+    db.execute('select * from log where category=?', c_name[j]) do |row|
+      if c_location[j]==""
+        c_location[j]=row[1]
+      else
+        c_location[j]=c_location[j].to_s+","+row[1].to_s
+      end
+    end
+    printf("c_name[%s]:%s\n",j, c_name[j])
+    printf("c_location[%s]:%s\n",j, c_location[j])
+    if c_location[j].to_s!=""
+    add_db_c_location(c_name[j], c_location[j])
+    end
+  end
+  db.close
+end
+
+def add_db_c_location(category, location)
+    puts "call add_db_c_location!\n"
+    printf("category:%s, location:%s\n",category,location)
+  #categoryにカテゴリ名、locationにカンマ区切りの位置名が入ってる
+  loca = location.split(',')
+  num = loca.count
+  db = SQLite3::Database.new('scheduler.db')
+  db.results_as_hash = true
+  #↓位置名の個数を取得
+  l_num=0
+  db.execute('select * from location') do |row|
+    l_num=l_num+1
+  end
+  l_name=Array.new(l_num)
+  i=0
+#↓配列に位置名を格納
+  db.execute('select * from location') do |row|
+    l_name[i]=row[1]
+    i=i+1
+  end
+  #items = Locate_events.new
+  #items=loca.count
+  #puts items
+loca.inject(count=Hash.new(0)){|hash, a| hash[a] += 1; hash}
+search_max=""
+for i in 0..l_num.to_i-1
+if search_max==""
+  search_max= count[l_name[i]]
+else
+  search_max=search_max.to_s+","+count[l_name[i]].to_s
+end
+end
+ max=search_max.split(',')
+ p maxvalue=max.max
+
+ new_location=count.key(maxvalue.to_i)
+#new_locationが最も参照回数が多かった位置情報
+  db.execute('update category set location = ? where name=?', new_location, category)
+
+  db.close
+end
+
 db = SQLite3::Database.new('scheduler.db')
+  db.results_as_hash = true
   db.execute('select * from gps order by day desc, time desc limit 1') do |row|
     $gps=row[2].to_s
     $lastday=row[3].to_s
@@ -144,6 +222,7 @@ location_name=same_location(location)
 search_schedule(today, $get_time, location_name)
 
 if location!=""
+  #indexから来た時
   if $lastday.to_s==today.to_s && (to_min($get_time).to_i-to_min($lasttime).to_i) <10
     #10分
     #p "same"
@@ -154,6 +233,7 @@ if location!=""
     db.execute('insert into gps  (name, position, day, time) values(?, ?, ?, ?)', location_name, location, today, $get_time)
     db.close
   end
+   add_db_categorylocation
 elsif add_location!=""
   db = SQLite3::Database.new('scheduler.db')
   db.execute('insert into gps  (name, position, day, time) values(?, ?, ?, ?)', add_location, $gps, today, $get_time)
