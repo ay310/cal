@@ -277,6 +277,12 @@ end
     db.close
   end
 
+  def add_db_log
+    #ログ情報をtable"log"にいれる
+    wday=["sun", "mon", "tue","wed", "the", "fri", "sat", "sun"]
+    d.wday
+  end
+
   def add_db_task(i, s, st, et, num)
     #p num
       #printf("i:%s, s:%s, st:%s, et:%s\n", i, s, st, et)

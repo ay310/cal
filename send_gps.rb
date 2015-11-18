@@ -6,7 +6,9 @@ require 'sqlite3'
 require 'kconv'
 data = CGI.new
 print "Content-type: text/html\n\n"
+#indexから送られてくるやつ
 location = data['gps']
+#て入力した位置情報から送られてくるやつ
 add_location = data['addlocation']
 d = Time.now
 def chday(day)
@@ -24,6 +26,7 @@ def to_min(time)
 end
 
 def define_gps(gps)
+  #gpsを指定桁取得して変換する(現在は6桁ずつ)
   return nil if gps==""
   location = gps.split(',')
   lat=location[0]
@@ -33,7 +36,10 @@ def define_gps(gps)
   gps = lat[0].to_s+lat[1].to_s+lat[2].to_s+lat[3].to_s+lat[4].to_s+lat[5].to_s+","+lng[0].to_s+lng[1].to_s+lng[2].to_s+lng[3].to_s+lng[4].to_s+lng[5].to_s
   return gps
 end
+
 def same_location(gps)
+  #現在地が位置dbと一致しているものがあるか確認
+  #６回
   return nil if gps==""
   location = gps.split(',')
   lat=location[0]
@@ -54,7 +60,6 @@ def same_location(gps)
     i += 1
   end
     db.close
-
     for i in 0.. $num.to_i-1
       db_location=$db_gps[i].split(",")
       db_lat=db_location[0]
@@ -73,7 +78,18 @@ def same_location(gps)
     end
     return nil
   end
+
+  def add_db_log(s_name, s_category, location_name)
+    if s_name=""
+    else
+      db = SQLite3::Database.new('scheduler.db')
+        db.execute('insert into log(name, location, category, week, time) values(?, ?, ?, ?, ?)', s_name, location_name, s_category, $week, $get_time)
+      db.close
+    end
+  end
+
 def search_schedule(today, t, location_name)
+  #現在スケジュールが入っていた場合、そこに位置を記録する
   db = SQLite3::Database.new('scheduler.db')
   db.results_as_hash = true
     min = Array.new(1339, '0')
@@ -92,6 +108,7 @@ def search_schedule(today, t, location_name)
       if min[to_min(t).to_i]!=0
         db.execute('update schedule set location = ? where id=?', location_name, min[to_min(t).to_i])
         db.execute('select * from schedule where id=?', min[to_min(t).to_i]) do |row|
+          $s_name=row[1].to_s
           $s_category=row[6].to_s
         end
         #printf("s_category=%s\n", $s_category)
@@ -106,11 +123,10 @@ def search_schedule(today, t, location_name)
         end
         #printf("new_location=%s\n", new_location)
         db.execute('update category set location = ? where name=?', new_location, $s_category)
+        add_db_log($s_name, $s_category, location_name)
       end
   db.close
 end
-today = d.year.to_s + '-' + chday(d.month).to_s + '-' + chday(d.day).to_s
-get_time = chday(d.hour).to_s+":"+chday(d.min).to_s
 
 db = SQLite3::Database.new('scheduler.db')
   db.execute('select * from gps order by day desc, time desc limit 1') do |row|
@@ -119,25 +135,28 @@ db = SQLite3::Database.new('scheduler.db')
     $lasttime=row[4].to_s
   end
 db.close
+
+today = d.year.to_s + '-' + chday(d.month).to_s + '-' + chday(d.day).to_s
+$get_time = chday(d.hour).to_s+":"+chday(d.min).to_s
+$week=d.wday
+
 location_name=same_location(location)
-search_schedule(today, get_time, location_name)
-
-
+search_schedule(today, $get_time, location_name)
 
 if location!=""
-  if $lastday.to_s==today.to_s && (to_min(get_time).to_i-to_min($lasttime).to_i) <5
-    #３分
+  if $lastday.to_s==today.to_s && (to_min($get_time).to_i-to_min($lasttime).to_i) <10
+    #10分
     #p "same"
   else
     #p "not_same"
     puts "gpsを追加"
     db = SQLite3::Database.new('scheduler.db')
-    db.execute('insert into gps  (name, position, day, time) values(?, ?, ?, ?)', location_name, location, today, get_time)
+    db.execute('insert into gps  (name, position, day, time) values(?, ?, ?, ?)', location_name, location, today, $get_time)
     db.close
   end
 elsif add_location!=""
   db = SQLite3::Database.new('scheduler.db')
-  db.execute('insert into gps  (name, position, day, time) values(?, ?, ?, ?)', add_location, $gps, today, get_time)
+  db.execute('insert into gps  (name, position, day, time) values(?, ?, ?, ?)', add_location, $gps, today, $get_time)
   new_gps=define_gps($gps)
   db.execute('insert into location  (name, gps) values(?, ?)', add_location, new_gps)
   db.close
