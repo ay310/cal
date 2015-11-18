@@ -75,9 +75,11 @@ def same_location(gps)
   end
 def search_schedule(today, t, location_name)
   db = SQLite3::Database.new('scheduler.db')
+  db.results_as_hash = true
     min = Array.new(1339, '0')
     num=0
     db.execute('select * from schedule where s_day=?', today) do |row|
+      #今日の1440分を0でうめ、予定がある分はスケジュールのidを埋め込む
       st=to_min(row[3]).to_i
       et=to_min(row[5]).to_i
       id=row[0].to_i
@@ -85,10 +87,26 @@ def search_schedule(today, t, location_name)
         min[i]=id
       end
     end
-    puts min[to_min(t).to_i]
-    if min[to_min(t).to_i]!=0
+    n=0
+      puts min[to_min(t).to_i]
+      if min[to_min(t).to_i]!=0
         db.execute('update schedule set location = ? where id=?', location_name, min[to_min(t).to_i])
-    end
+        db.execute('select * from schedule where id=?', min[to_min(t).to_i]) do |row|
+          $s_category=row[6].to_s
+        end
+        #printf("s_category=%s\n", $s_category)
+        db.execute('select * from category where name=?', $s_category) do |row|
+          $c_location=row[1].to_s
+        end
+        #printf("c_location=%s\n", $c_location)
+        if $c_location==""
+          new_location=location_name.to_s
+        else
+          new_location=$c_location.to_s+","+location_name.to_s
+        end
+        #printf("new_location=%s\n", new_location)
+        db.execute('update category set location = ? where name=?', new_location, $s_category)
+      end
   db.close
 end
 today = d.year.to_s + '-' + chday(d.month).to_s + '-' + chday(d.day).to_s

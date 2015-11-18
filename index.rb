@@ -281,7 +281,7 @@ end
     #p num
       #printf("i:%s, s:%s, st:%s, et:%s\n", i, s, st, et)
   	db = SQLite3::Database.new('scheduler.db')
-  	db.execute('insert into schedule  (title, s_day, s_time, e_day, e_time, st, completed) values(?, ?, ?, ?, ?, ?, ?)', @t_title[i], @s_day[s], st, @s_day[s], et, @t_id[i], '0')
+  	db.execute('insert into schedule  (title, s_day, s_time, e_day, e_time, category, st, completed) values(?, ?, ?, ?, ?, ?, ?, ?)', @t_title[i], @s_day[s], st, @s_day[s], et, @t_category[i], @t_id[i], '0')
     if @l_tasktime[i]=="00:00"
       @l_tasktime[i]=to_h(to_min(et).to_i-to_min(st).to_i)
     else
@@ -313,21 +313,21 @@ end
     #s_day[@num_i]~enddayまでの間にスケジュールを追加する
     read_task
     read_category
-    i=0
-    for j in 0.. @c_num.to_i-1
-      #カテゴリテーブルのカテゴリj
-      if @t_category[i]==@c_name[j]
-        #現在のタスクiのカテゴリ名がカテゴリとヒットした時
-        c=j
-        break;
-      end
-    end
     #タスクiのカテゴリは@c_name[c]である
     for i in 0..@t_num.to_i-1
       check_tasktime(@t_id[i])
       #タスクの残り作業時刻の計測
       #$resttimeが変数
       #puts i
+      for j in 0.. @c_num.to_i-1
+        #カテゴリテーブルのカテゴリj
+        if @t_category[i]==@c_name[j]
+          #現在のタスクiのカテゴリ名がカテゴリとヒットした時
+          c=j
+          break;
+        end
+      end
+      #puts c
       if  $resttime.to_i<=0
         i=i+1
       else

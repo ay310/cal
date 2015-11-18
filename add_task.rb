@@ -77,7 +77,7 @@ def update_task(t_id, title, e_day, e_time, tasktime, about, category, star)
   db.execute('update task set importance =?  where id=?', star, t_id)
   db.close
   print '<html>'
-  print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
+  print '<head><META http-equiv="refresh"; content="0; URL=index.rb"></head><body></body></html>'
 end
 
 def add_task(title, e_day, e_time, tasktime, about, category, star)
@@ -193,7 +193,11 @@ def task_scheduler(cal_t_id, cal_s_id, cal_st, cal_et, cal_plan_st, cal_plan_et)
   db.execute('update task set located =?  where id=?', t, cal_t_id)
   tt = to_h(cal_ptime($c_time, completed_time))
   #完了済時間の追加
-  new_log = $log.to_s+","+to_min(completed_time).to_s
+  if $log==""
+    new_log=to_min(completed_time).to_s
+  else
+    new_log = $log.to_s+","+to_min(completed_time).to_s
+  end
   db.execute('update task set log =?  where id=?', new_log, cal_t_id)
   db.execute('update task set time =?  where id=?', tt, cal_t_id)
   db.execute('update schedule set completed =?  where id=?', "1", cal_s_id)
