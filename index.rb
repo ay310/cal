@@ -109,12 +109,18 @@ class Locate_events
 
   def check_tasktime(id)
     #残りの作業時刻を計算してくれる
+    #printf("L114 // call check_tasktime(id=%s)\n", id)
     db = SQLite3::Database.new('scheduler.db')
     db.results_as_hash = true
     db.execute('select * from task where id=?', id) do |row|
+      $row4=row[4].to_s
+      $row8=row[8].to_s
+      $row9=row[9].to_s
+      #printf("%s, %s, %s\n", to_min($row4), to_min($row8), to_min($row9))
       $resttime=to_min(row[4].to_s).to_i-(to_min(row[8].to_s).to_i+to_min(row[9].to_s).to_i).to_i
     end
     db.close
+    #printf("  L123 // id:%sのresttimeは%s\n", id, $resttime)
     return $resttime
   end
 
@@ -136,6 +142,7 @@ class Locate_events
     @st = Array.new(@num)
     @category = Array.new(@num)
     @com = Array.new(@num)
+    @location = Array.new(@num)
     i = 0
     db.execute('select * from schedule order by s_day asc, s_time asc') do |row|
       @id[i] = row['id'].to_s.toutf8
@@ -146,6 +153,7 @@ class Locate_events
       @e_time[i] = row['e_time'].to_s.toutf8
       @st[i] = row['st'].to_s.toutf8
       @com[i] = row['completed']
+      @location[i] = row['location']
       i += 1
     end
     db.close
@@ -164,12 +172,14 @@ class Locate_events
     @c_max = Array.new(@c_num)
     @c_min = Array.new(@c_num)
     @c_log = Array.new(@c_num)
+    @c_location = Array.new(@c_num)
     i = 0
     db.execute('select * from category') do |row|
       @c_name[i] = row['name'].to_s.toutf8
       @c_max[i] = row['max'].to_s.toutf8
-            @c_min[i] = row['min'].to_s.toutf8
-                  @c_log[i] = row['log'].to_s.toutf8
+      @c_min[i] = row['min'].to_s.toutf8
+      @c_log[i] = row['log'].to_s.toutf8
+      @c_location[i] = row['location'].to_s.toutf8
       i += 1
     end
     db.close
@@ -191,14 +201,14 @@ class Locate_events
     read_schedule
     i = 0
     while i < @num.to_i - 1
-      if chint(@s_day[i].to_s).to_i - chint(day.to_s).to_i > 0
+      if chint(@s_day[i].to_s).to_i - chint(day.to_s).to_i >= 0
         @num_i = i
         break
       else
         i += 1
       end
     end
-     #p @num_i
+    # p @num_i, @title[@num_i]
   end
 
 def decide_sday
@@ -218,7 +228,7 @@ end
     decide_s_schedule(@today)
     overlap = 0
     #printf("search_same:@num_i=%s",@num_i)
-    for i in@num_i.to_i-1..@num.to_i - 1
+    for i in@num_i.to_i..@num.to_i
       #printf("件名%s...開始%s,終了%s\n", @title[i],@s_day[i],@e_day[i])
       if @title[i] == name && @s_day[i] == sd && @s_time[i] == st && @e_day[i] == ed && @e_time[i] == et
         overlap = 1
@@ -283,11 +293,12 @@ end
     d.wday
   end
 
-  def add_db_task(i, s, st, et, num)
+  def add_db_task(i, inputday, st, et)
+  #  printf("!!call add_db_task (%s, %s, %s, %s)\n", i, inputday, st, et)
     #p num
-      #printf("i:%s, s:%s, st:%s, et:%s\n", i, s, st, et)
+    #printf("i:%s, s:%s, st:%s, et:%s\n", i, s, st, et)
   	db = SQLite3::Database.new('scheduler.db')
-  	db.execute('insert into schedule  (title, s_day, s_time, e_day, e_time, category, st, completed) values(?, ?, ?, ?, ?, ?, ?, ?)', @t_title[i], @s_day[s], st, @s_day[s], et, @t_category[i], @t_id[i], '0')
+  	db.execute('insert into schedule  (title, s_day, s_time, e_day, e_time, category, st, completed) values(?, ?, ?, ?, ?, ?, ?, ?)', @t_title[i], inputday, st, inputday, et, @t_category[i], @t_id[i], '0')
     if @l_tasktime[i]=="00:00"
       @l_tasktime[i]=to_h(to_min(et).to_i-to_min(st).to_i)
     else
@@ -295,123 +306,204 @@ end
     end
   	db.execute('update task set located = ? where id=?', @l_tasktime[i], @t_id[i])
   	db.close
+    read_task
   	check_tasktime(@t_id[i])
   end
 
   def null_task
     read_task
+    serchday=@today
+    decide_s_schedule(@today)
+    s=@num_i.to_i
     db = SQLite3::Database.new('scheduler.db')
-    for i in 0.. @t_num.to_i-1
-      db.execute('update task set located = ? where id=?', "00:00", @t_id[i])
+    while s==@num-1
+      if chint(searchday).to_i < chint(@e_day[s]).to_i
+        searchday=nextday(searchday)
+      end
+      if searchday==@s_day[s] && @st[s]!="s"
+        db.execute('delete from schedule where id=?', @id[s])
+        del_min=to_min(@e_time[s]).to_i-to_min(@s_time[s]).to_i
+        for i in 0.. @t_num-1
+          if @st[s]==@t_id[i]
+            id=i
+            break
+          end
+        end
+        new_located=to_h(to_min(@l_tasktime[id]).to_i-del_min.to_i)
+        db.execute('update task set located = ? where id=?', new_located, @t_id[id])
+      end
+      s=s+1
     end
-        db.execute('delete from schedule where completed=?', "0")
     db.close
   end
 
+  def task_add_time(s_time, e_time, b_time, task, c, inputday, i, flag)
+    #stとetを決める sの追加はput_taskでやったもらったほうがよいかも
+    if flag=="0"
+      if @c_min[c].to_i>b_time.to_i
+        #printf(" X( call 325\n")
+      else
+        if @c_min[c].to_i>task
+        #  printf(" call 328\n")
+          task=@c_min[c].to_i
+          add_time=@c_min[c].to_i-task.to_i
+          new_tasktime=to_h(to_min(@tasktime[i]).to_i+add_time.to_i)
+          @tasktime[i]=new_tasktime
+          db = SQLite3::Database.new('scheduler.db')
+            db.execute('update task set t_time = ? where id=?', @tasktime, @t_id[i])
+          db.close
+          #ここまで、タスクがc_min以下だった場合タスク時間をc_minの差分分増やす
+        end
+        b_time = b_time.to_i-20
+        if b_time.to_i >task.to_i
+          if task.to_i > @c_max[c].to_i
+            #ad c_max
+            st=to_h(to_min(e_time).to_i+10)
+            et=to_h(to_min(st).to_i+@c_max[c].to_i)
+            add_db_task(i, inputday, st, et)
+          elsif task.to_i < @c_max[c].to_i
+            #ad task
+            st=to_h(to_min(e_time).to_i+10)
+            et=to_h(to_min(st).to_i+task.to_i)
+            add_db_task(i, inputday, st, et)
+          end
+        else
+          if b_time.to_i>@c_max[c].to_i
+            #ad c_mac
+            st=to_h(to_min(e_time).to_i+10)
+            et=to_h(to_min(st).to_i+@c_max[c].to_i)
+            add_db_task(i, inputday, st, et)
+          elsif b_time.to_i < @c_max[c].to_i
+            #ad b_time
+            st=to_h(to_min(e_time).to_i+10)
+            et=to_h(to_min(st).to_i+b_time.to_i)
+            add_db_task(i, inputday, st, et)
+          end
+        end
+      end
+    else
+      #flag==1のとき
+      if@c_max[c].to_i>task.to_i
+        if b_time.to_i+60>task.to_i
+          st=to_h(to_min(e_time).to_i+30)
+          et=to_h(to_min(st).to_i+task.to_i)
+          add_db_task(i, inputday, st, et)
+        elsif b_time.to_i+60<=task.to_i
+        end
+      end
+    end
+  end
+
+
+
   def put_task
+  #  printf("call put_task\n")
     #タスクのeventの追加処理
     decide_s_schedule(@today)
-    #スケジュールを日付順に並べ替え、@num_i番目が今日＋１日目のスケジュール
     s=@num_i.to_i
+    #スケジュールを日付順に並べ替え、@num_i番目が今日＋１日目のスケジュール
     #@s_day[s]が今日＋１日めのスケジュール
     endday=decide_eday
     day=decide_sday
     #s_day[@num_i]~enddayまでの間にスケジュールを追加する
+    #タスクiのカテゴリは@c_name[c]である
     read_task
     read_category
-    #タスクiのカテゴリは@c_name[c]である
-    for i in 0..@t_num.to_i-1
+    i=0
+  #  printf("t_num:%s\n",@t_num)
+    until i==@t_num
+      read_schedule
+    #  printf("L350 iは%s\n", i)
       check_tasktime(@t_id[i])
       #タスクの残り作業時刻の計測
       #$resttimeが変数
-      #puts i
-      for j in 0.. @c_num.to_i-1
-        #カテゴリテーブルのカテゴリj
-        if @t_category[i]==@c_name[j]
-          #現在のタスクiのカテゴリ名がカテゴリとヒットした時
-          c=j
-          break;
-        end
-      end
-      #puts c
-      if  $resttime.to_i<=0
-        i=i+1
-      else
-        #$iのresttimeが0じゃないとき
-        until day == endday
-          if $resttime.to_i==0
-            break
-            #p "break"
+      if $resttime!=0
+      endday=@te_day[i]
+        for j in 0.. @c_num.to_i-1
+          #カテゴリテーブルのカテゴリj
+          if @t_category[i]==@c_name[j]
+            #現在のタスクiのカテゴリ名がカテゴリとヒットした時
+            c=j
+            break;
           end
-          if s<@num.to_i-1
-            #スケジュールが終わった場合
-            if chint(day).to_i > chint(@e_day[s]).to_i
-              s=s+1
-            else
-              if @e_day[s]==@s_day[s+1]
-                #puts "スケジュールが同日に２つ以上有る時"
-                bettime=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
-                #printf("resttime:%s, bettime%s\n", $resttime, bettime)
-                if $resttime.to_i+20 < bettime.to_i
-                  if $resttime.to_i+20 < @c_max[c].to_i
-                    st=to_h(to_min(@e_time[s]).to_i+10)
-                    et=to_h(to_min(st).to_i+$resttime)
-                    add_db_task(i, s, st, et, 1)
-                    s=s+1
-                    #printf("resttime:%s",$resttime)
-                    if $resttime.to_i<=0
-                      break
-                    end
-                  else
-                    st=to_h(to_min(@e_time[s]).to_i+10)
-                    et=to_h(to_min(st).to_i+@c_max[c].to_i)
-                    add_db_task(i, s, st, et, 2)
-                    s=s+1
-                  end
-                else
-                  if bettime.to_i > @c_max[c].to_i+20
-                    if $resttime.to_i+20 < @c_max[c].to_i
-                      st=to_h(to_min(@e_time[s]).to_i+10)
-                      et=to_h(to_min(st).to_i+$resttime)
-                      add_db_task(i, s, st, et, 3)
-                      s=s+1
-                    else
-                      st=to_h(to_min(@e_time[s]).to_i+10)
-                      et=to_h(to_min(st).to_i+@c_max[c].to_i)
-                      add_db_task(i, s, st, et, 4)
-                      s=s+1
-                    end
-                  else
-                    if bettime.to_i>@c_min[c].to_i+20
-                      if $resttime.to_i+20 < bettime.to_i
-                        st=to_h(to_min(@e_time[s]).to_i+10)
-                        et=to_h(to_min(st).to_i+$resttime)
-                        add_db_task(i, s, st, et, 5)
-                        s=s+1
-                      else
-                        st=to_h(to_min(@e_time[s]).to_i+10)
-                        et=to_h(to_min(st).to_i+bettime.to_i-20)
-                        add_db_task(i, s, st, et, 6)
-                        s=s+1
-                      end
-                    else
-                      s=s+1
-                    end
-                  end
-                end
+        end
+        #↑カテゴリ検索end
+        checkday=@today
+        until checkday==endday
+          if $resttime==0
+            break;
+          end
+          #  printf("checkday : %s, endday : %s\n",checkday, endday)
+          while chint(checkday).to_i>chint(@e_day[s]).to_i
+            s=s+1
+          end
+          if chint(checkday).to_i < chint(@e_day[s]).to_i
+            checkday=nextday(checkday)
+          end
+          #printf("%s, %s\n",@e_day[s], @s_day[s+1])
+          if checkday==@e_day[s]
+            #指定日に予定がある
+            if @e_day[s]==@s_day[s+1]
+              #その次の予定も同日である
+              if @category[s]==@c_name[c]
+                b_time=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
+                #printf("b_time is %s\n", b_time)
+                task_add_time(@s_time[s+1], @e_time[s], b_time,$resttime, c, checkday, i, "0")
+                s=s+1
+              elsif @category[s]==nil
+                b_time=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
+              #  printf("b_time is %s\n", b_time)
+                task_add_time(@s_time[s+1], @e_time[s], b_time, $resttime, c, checkday, i, "0")
+                s=s+1
               else
-                #e_day[s]!=s_day[s+1]
+                s=s+1
+              end
+            else
+              if to_min(@e_time[s]).to_i < to_min("12:00")
+                #タスクを配置する
               end
             end
-            else
-          end
-          if $resttime.to_i==0
-            break
-          #  p "break"
+          else
+            #指定日に予定がない
           end
         end
+        #checkdayが締め切りになるまで
+        if $resttime!=0
+          #以下、カテゴリどうし近しいものが無かった場合強制的に追加
+          checkday=@today
+          decide_s_schedule(@today)
+          s=@num_i.to_i
+          until checkday==endday
+            if $resttime==0
+              break;
+            end
+            while chint(checkday).to_i>chint(@e_day[s]).to_i
+              s=s+1
+            end
+            if chint(checkday).to_i < chint(@e_day[s]).to_i
+              checkday=nextday(checkday)
+            end
+            if checkday==@e_day[s]
+              if @e_day[s]==@s_day[s+1]
+                b_time=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
+                task_add_time(@s_time[s+1], @e_time[s], b_time, $resttime, c, checkday, i, s)
+                s=s+1
+              else
+                #同日に次の予定がない場合
+              end
+            else
+              #指定日に予定がない
+            end
+          end
+        end
+        i=i+1
+      else
+        #resttimeが0の時
+        i=i+1
       end
+      #↑resttime!=0 end
     end
+    #↑until i==@t_num end
   end
 
   def view_event
@@ -524,6 +616,7 @@ event.decide_s_schedule(today)
 # event.overlap_event("2015-11-04", "2015-11-04", "15:00", "17:00")
 event.null_task
 event.put_task
+
 event.view_event
 print_t('js2.txt')
 print '</head>'

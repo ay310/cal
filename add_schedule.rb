@@ -160,7 +160,7 @@ def search_category(name)
   if found == 0
     # カテゴリが新規（フラグが立たなかった）時
     db.transaction do
-      db.execute('insert into category  (name, s, t) values(?, ?, ?)', name, "1", "0")
+      db.execute('insert into category  (name, s, t, max, min) values(?, ?, ?, ?, ?)', name, "1", "0", "180", "30")
     end
   else
     #カテゴリがあったが、スケジュールで作成されたタスクだった場合

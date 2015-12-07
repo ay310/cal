@@ -241,5 +241,5 @@ elsif add_location!=""
   db.execute('insert into location  (name, gps) values(?, ?)', add_location, new_gps)
   db.close
 end
-print '<html>\n'
-print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
+print '<html>'
+print '<head><META http-equiv="refresh"; content="0; URL=index.rb"></head><body></body></html>'
