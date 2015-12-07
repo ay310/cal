@@ -56,7 +56,9 @@ def nextday(today)
     month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
   end
   mm = day[1].to_i
-  if day[2].to_i < month[mm - 1].to_i
+  if day[1]=="12" && day[2]=="31"
+    return (day[0].to_i+1).to_s + "-01-01"
+  elsif day[2].to_i < month[mm - 1].to_i
     dd = day[2].to_i + 1
     return day[0].to_s + '-' + chday(day[1]).to_s + '-' + chday(dd).to_s
   else
@@ -152,6 +154,7 @@ class Locate_events
       @s_time[i] = row['s_time'].to_s.toutf8
       @e_time[i] = row['e_time'].to_s.toutf8
       @st[i] = row['st'].to_s.toutf8
+      @category[i]=row['category']
       @com[i] = row['completed']
       @location[i] = row['location']
       i += 1
@@ -201,7 +204,7 @@ class Locate_events
     read_schedule
     i = 0
     while i < @num.to_i - 1
-      if chint(@s_day[i].to_s).to_i - chint(day.to_s).to_i >= 0
+      if chint(@e_day[i].to_s).to_i - chint(day.to_s).to_i >= 0
         @num_i = i
         break
       else
@@ -209,6 +212,20 @@ class Locate_events
       end
     end
     # p @num_i, @title[@num_i]
+  end
+
+  def decide_e_schedule(day)
+    read_schedule
+    i = 0
+    while i < @num.to_i - 1
+      if chint(@s_day[i].to_s).to_i - chint(day.to_s).to_i >0
+        @num_i = i
+        break
+      else
+        i += 1
+      end
+    end
+    @num_i=@num_i-1
   end
 
 def decide_sday
@@ -259,9 +276,22 @@ end
     return overlap
   end
 
-  def sleep_t(st, et)
+  def sleep_t
     day = @today
     db = SQLite3::Database.new('scheduler.db')
+    db.results_as_hash = true
+    db.execute('select * from person') do |row|
+      $sleep_st=row[1].to_s
+      $sleep_et=row[2].to_s
+    end
+    st=$sleep_st
+    et=$sleep_et
+    sd=day
+    ed=day
+    for i in 0..@inputdays.to_i-1
+      ed=nextday(ed)
+    end
+    null_sleep(sd, ed)
     for i in 0..@inputdays.to_i - 1
       s_day = day
       e_day = nextday(day)
@@ -294,7 +324,7 @@ end
   end
 
   def add_db_task(i, inputday, st, et)
-  #  printf("!!call add_db_task (%s, %s, %s, %s)\n", i, inputday, st, et)
+    ##printf("test: !!call add_db_task (%s, %s, %s, %s)\n", i, inputday, st, et)
     #p num
     #printf("i:%s, s:%s, st:%s, et:%s\n", i, s, st, et)
   	db = SQLite3::Database.new('scheduler.db')
@@ -310,13 +340,19 @@ end
   	check_tasktime(@t_id[i])
   end
 
+  def null_sleep(sd,ed)
+  end
+
   def null_task
+    #printf("test:[call null_task]!\n")
     read_task
-    serchday=@today
+    searchday=@today
     decide_s_schedule(@today)
     s=@num_i.to_i
     db = SQLite3::Database.new('scheduler.db')
-    while s==@num-1
+      #printf("test:@s_name[%s]:%s\n", s, @title[s])
+    while s!=@num-1
+      #printf("test:@s_name[%s]:%s\n", s, @title[s])
       if chint(searchday).to_i < chint(@e_day[s]).to_i
         searchday=nextday(searchday)
       end
@@ -329,8 +365,11 @@ end
             break
           end
         end
+        #printf("test:%s del_min=%s, id=%s\n", @t_title[id], del_min, @t_id[id])
         new_located=to_h(to_min(@l_tasktime[id]).to_i-del_min.to_i)
+        #printf("test:%s located=%s, id=%s\n", @t_title[id], new_located, @t_id[id])
         db.execute('update task set located = ? where id=?', new_located, @t_id[id])
+        @l_tasktime[id]=new_located
       end
       s=s+1
     end
@@ -338,25 +377,27 @@ end
   end
 
   def task_add_time(s_time, e_time, b_time, task, c, inputday, i, flag)
-    #stとetを決める sの追加はput_taskでやったもらったほうがよいかも
-    if flag=="0"
-      if @c_min[c].to_i>b_time.to_i
-        #printf(" X( call 325\n")
-      else
-        if @c_min[c].to_i>task
-        #  printf(" call 328\n")
-          task=@c_min[c].to_i
-          add_time=@c_min[c].to_i-task.to_i
-          new_tasktime=to_h(to_min(@tasktime[i]).to_i+add_time.to_i)
-          @tasktime[i]=new_tasktime
-          db = SQLite3::Database.new('scheduler.db')
-            db.execute('update task set t_time = ? where id=?', @tasktime, @t_id[i])
-          db.close
-          #ここまで、タスクがc_min以下だった場合タスク時間をc_minの差分分増やす
+    b_time = b_time.to_i-20
+    if b_time.to_i<10
+    elsif b_time.to_i>0
+      #stとetを決める sの追加はput_taskでやったもらったほうがよいかも
+      if flag=="0"
+        if @c_min[c].to_i>b_time.to_i
+        else
+          if @c_min[c].to_i>task
+            task=@c_min[c].to_i
+            add_time=@c_min[c].to_i-task.to_i
+            new_tasktime=to_h(to_min(@tasktime[i]).to_i+add_time.to_i)
+            @tasktime[i]=new_tasktime
+            db = SQLite3::Database.new('scheduler.db')
+              db.execute('update task set t_time = ? where id=?', @tasktime, @t_id[i])
+              db.close
+              #ここまで、タスクがc_min以下だった場合タスク時間をc_minの差分分増やす
         end
-        b_time = b_time.to_i-20
         if b_time.to_i >task.to_i
+          ##printf("test: call392\n")
           if task.to_i > @c_max[c].to_i
+          ##printf("test: call394n")
             #ad c_max
             st=to_h(to_min(e_time).to_i+10)
             et=to_h(to_min(st).to_i+@c_max[c].to_i)
@@ -365,6 +406,7 @@ end
             #ad task
             st=to_h(to_min(e_time).to_i+10)
             et=to_h(to_min(st).to_i+task.to_i)
+            ##printf("test: call403\n")
             add_db_task(i, inputday, st, et)
           end
         else
@@ -372,11 +414,13 @@ end
             #ad c_mac
             st=to_h(to_min(e_time).to_i+10)
             et=to_h(to_min(st).to_i+@c_max[c].to_i)
+            ##printf("test: call411\n")
             add_db_task(i, inputday, st, et)
           elsif b_time.to_i < @c_max[c].to_i
             #ad b_time
             st=to_h(to_min(e_time).to_i+10)
             et=to_h(to_min(st).to_i+b_time.to_i)
+            ##printf("test: call417(st:%s, et%s, b_time:%s)\n", st, et, b_time)
             add_db_task(i, inputday, st, et)
           end
         end
@@ -393,14 +437,15 @@ end
       end
     end
   end
+  end
 
 
 
   def put_task
-  #  printf("call put_task\n")
-    #タスクのeventの追加処理
     decide_s_schedule(@today)
     s=@num_i.to_i
+  #  printf("call put_task\n")
+    #タスクのeventの追加処理
     #スケジュールを日付順に並べ替え、@num_i番目が今日＋１日目のスケジュール
     #@s_day[s]が今日＋１日めのスケジュール
     endday=decide_eday
@@ -412,13 +457,12 @@ end
     i=0
   #  printf("t_num:%s\n",@t_num)
     until i==@t_num
-      read_schedule
-    #  printf("L350 iは%s\n", i)
+      #printf("test:L448 iは%s, %s\n", i, @num)
       check_tasktime(@t_id[i])
       #タスクの残り作業時刻の計測
       #$resttimeが変数
       if $resttime!=0
-      endday=@te_day[i]
+        endday=@te_day[i]
         for j in 0.. @c_num.to_i-1
           #カテゴリテーブルのカテゴリj
           if @t_category[i]==@c_name[j]
@@ -430,15 +474,13 @@ end
         #↑カテゴリ検索end
         checkday=@today
         until checkday==endday
+          #printf("test:checkyday=%s, %s:@e_day[s]=%s\n",checkday, @title[s],@e_day[s])
           if $resttime==0
             break;
           end
           #  printf("checkday : %s, endday : %s\n",checkday, endday)
           while chint(checkday).to_i>chint(@e_day[s]).to_i
             s=s+1
-          end
-          if chint(checkday).to_i < chint(@e_day[s]).to_i
-            checkday=nextday(checkday)
           end
           #printf("%s, %s\n",@e_day[s], @s_day[s+1])
           if checkday==@e_day[s]
@@ -465,6 +507,9 @@ end
             end
           else
             #指定日に予定がない
+          end
+          if chint(checkday).to_i < chint(@e_day[s]).to_i
+            checkday=nextday(checkday)
           end
         end
         #checkdayが締め切りになるまで
@@ -497,9 +542,13 @@ end
           end
         end
         i=i+1
+        decide_s_schedule(@today)
+        s=@num_i.to_i
       else
         #resttimeが0の時
         i=i+1
+        decide_s_schedule(@today)
+        s=@num_i.to_i
       end
       #↑resttime!=0 end
     end
@@ -547,10 +596,11 @@ end
   def view_taskmenu
     read_task
     print_t('body1.txt')
+    printf("<p><a href=\"feedback.rb\">振り返り</a></p>\n")
     print "<p>現在地は"
     print read_location.to_s
     print "です</p>\n"
-    print "　→<p><a href=\"add_location.rb\" alt=\"タスクの入力\">現在地の入力</a></p>\n"
+    print "<p>→<a href=\"add_location.rb\" alt=\"タスクの入力\">現在地の入力</a></p>\n"
     print " <p><a href=\"new_schedule.rb\">スケジュールの新規作成</a></p>\n"
     print "<p><a href=\"in_task.rb\" alt=\"タスクの入力\">タスクの新規作成</a></p>\n"
     print "<p><a href=\"edit_category.rb\">カテゴリの編集</a></p>\n"
@@ -560,24 +610,49 @@ end
     print "<FORM name=\"form1\" action=\"edit_task.rb\" onSubmit=\"return false\">\n"
     print "<INPUT type=\"hidden\" name=\"taskid\" value=\""
     print "\">"
-    for i in 0..@t_num - 1.to_i
-      print "<INPUT type=\"radio\" onClick=\"mySubmit('"
-      print @t_id[i]
-      print "')\"> "
-      print '<b>' if @t_imp[i] == '3'
-      print @t_title[i]
-      print '</b>' if @t_imp[i] == '3'
-      print ' ('
-      print to_h(to_min(@tasktime[i]).to_i - to_min(@c_tasktime[i]).to_i)
-      print ')'
-      print "</br>\n"
-      print '<div class=\'box-lid-menu-postscript\'>〆 '
-      print @te_day[i]
-      print ', '
-      print @te_time[i]
-      print '<br>'
-      print @t_about[i]
-      print "</div>\n"
+    for i in 0..@t_num-1.to_i
+      if @tasktime[i].to_s!=@c_tasktime[i].to_s
+        print "<INPUT type=\"radio\" onClick=\"mySubmit('"
+        print @t_id[i]
+        print "')\"> "
+        print '<b>' if @t_imp[i] == '3'
+        print @t_title[i]
+        print '</b>' if @t_imp[i] == '3'
+        print ' ('
+        print to_h(to_min(@tasktime[i]).to_i - to_min(@c_tasktime[i]).to_i)
+        print ')'
+        print "</br>\n"
+        print '<div class=\'box-lid-menu-postscript\'>〆 '
+        print @te_day[i]
+        print ', '
+        print @te_time[i]
+        print '<br>'
+        print @t_about[i]
+        print "</div>\n"
+      end
+    end
+    print "<div id = \"buttom\" align=\"right\" style=\"clear:both;\"></div>\n"
+    print ' </form></div> '
+
+    print "<b>||| 完了済みTask</b><div class='box-lid-menulist'>\n"
+    print "<FORM name=\"form2\" action=\"edit_task.rb\" onSubmit=\"return false\">\n"
+    print "<INPUT type=\"hidden\" name=\"taskid\" value=\""
+    print "\">"
+    for i in 0..@t_num-1.to_i
+      if @tasktime[i].to_s==@c_tasktime[i].to_s
+        print "<INPUT type=\"radio\" onClick=\"mySubmit('"
+        print @t_id[i]
+        print "')\"> "
+        print @t_title[i]
+        print "</br>\n"
+        print '<div class=\'box-lid-menu-postscript\'>〆 '
+        print @te_day[i]
+        print ', '
+        print @te_time[i]
+        print '<br>'
+        print @t_about[i]
+        print "</div>\n"
+      end
     end
     print "<div id = \"buttom\" align=\"right\" style=\"clear:both;\"></div>\n"
     print ' </form></div> '
@@ -593,8 +668,6 @@ print_t('js1.txt')
 #
 # 以下、イベント追加の記述
 # ユーザ設定に必要な変数
-sleep_st = '22:30'
-sleep_et = '08:00'
 inputdays = '14'
 eat_st = ['08:00', '12:00', '19:30']
 eat_et = ['08:30', '13:00', '20:10']
@@ -608,7 +681,7 @@ for n in 0..365
 end
 
 event = Locate_events.new(today, inputdays)
-event.sleep_t(sleep_st, sleep_et)
+#event.sleep_t
 for i in 0..2
 #  event.eating_t(eat_st[i], eat_et[i])
 end

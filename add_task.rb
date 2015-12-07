@@ -193,7 +193,7 @@ def task_scheduler(cal_t_id, cal_s_id, cal_st, cal_et, cal_plan_st, cal_plan_et)
   db.execute('update task set located =?  where id=?', t, cal_t_id)
   tt = to_h(cal_ptime($c_time, completed_time))
   #完了済時間の追加
-  if $log==""
+  if $log==nil
     new_log=to_min(completed_time).to_s
   else
     new_log = $log.to_s+","+to_min(completed_time).to_s
