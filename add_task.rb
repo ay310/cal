@@ -3,6 +3,7 @@
 require 'cgi'
 require 'sqlite3'
 require 'kconv'
+require 'active_support/all'
 data = CGI.new
 print "Content-type: text/html\n\n"
 #
@@ -168,7 +169,11 @@ end
 
 def cal_mtime(b_time, a_time)
   r_time = to_min(b_time).to_i - to_min(a_time).to_i
-  return r_time.to_i
+  if r_time.to_i<0
+    return 0.to_i
+  else
+    return r_time.to_i
+  end
 end
 
 def cal_ptime(b_time, a_time)
@@ -179,6 +184,7 @@ end
 def task_scheduler(cal_t_id, cal_s_id, cal_st, cal_et, cal_plan_st, cal_plan_et)
   # カレンダーから来た場合の処理
   db = SQLite3::Database.new('scheduler.db')
+  db.execute('update schedule set completed =?  where id=?', "1", cal_s_id)
   db.results_as_hash = true
   db.execute('select * from task where id=?', cal_t_id) do |row|
     $t_time = row[4]
@@ -186,6 +192,8 @@ def task_scheduler(cal_t_id, cal_s_id, cal_st, cal_et, cal_plan_st, cal_plan_et)
     $located_time = row[9]
     $log = row[10]
   end
+  db.execute('update schedule set s_time=?  where id=?', cal_st, cal_s_id)
+  db.execute('update schedule set e_time=?  where id=?', cal_et, cal_s_id)
   plan_tasktime = to_h(to_min(cal_plan_et).to_i - to_min(cal_plan_st).to_i)
   completed_time = to_h(to_min(cal_et).to_i - to_min(cal_st).to_i)
   t = to_h(cal_mtime($located_time, plan_tasktime))
@@ -193,26 +201,17 @@ def task_scheduler(cal_t_id, cal_s_id, cal_st, cal_et, cal_plan_st, cal_plan_et)
   db.execute('update task set located =?  where id=?', t, cal_t_id)
   tt = to_h(cal_ptime($c_time, completed_time))
   #完了済時間の追加
-  if $log==nil
-    new_log=to_min(completed_time).to_s
+  plan=to_min(completed_time).to_i-to_min(plan_tasktime).to_i
+  if $log.blank?
+    new_log=to_min(completed_time).to_s+"(".to_s+plan.to_s+")".to_s
   else
-    new_log = $log.to_s+","+to_min(completed_time).to_s
+    new_log = $log.to_s+","+to_min(completed_time).to_s+"(".to_s+plan.to_s+")".to_s
   end
   db.execute('update task set log =?  where id=?', new_log, cal_t_id)
   db.execute('update task set time =?  where id=?', tt, cal_t_id)
-  db.execute('update schedule set completed =?  where id=?', "1", cal_s_id)
-  if to_min(tt) > to_min($t_time)
-    db.execute('select * from task where id=?', cal_t_id) do |row|
-      $log = row[10]
-    end
-    inc_time=to_min(tt).to_i - to_min($t_time).to_i
-    add_log = $log.to_s+",INC:"+inc_time.to_s
-    db.execute('update task set t_time =?  where id=?', to_h(tt), cal_t_id)
-    db.execute('update task set log =?  where id=?', add_log, cal_t_id)
-  end
   db.close
-  print '<html>'
-  print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
+  #print '<html>'
+  #print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
 end
 
 if cal_t_id != '' && cal_s_id != ''
@@ -262,5 +261,5 @@ else
     print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
   else
     p 'error'
-end
+  end
 end

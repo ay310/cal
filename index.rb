@@ -67,6 +67,28 @@ def nextday(today)
   end
 end
 
+def prevday(today)
+  day = today.split('-')
+  if day[0] % 4 == 0 && day[0] % 100 == 0 && day[0] % 400 == 0
+    # うるうどし
+    month = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  else
+    month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  end
+  mm = day[1].to_i
+  if day[1]=="01" && day[2]=="01"
+    return day[0].to_i-1+"-12-31"
+  elsif day[2]=="01"
+    mm=day[1].to_i
+    dd=month[mm-2].to_i
+    mm=mm.to_i-1
+    return day[0].to_s + '-' + chday(mm).to_s + '-' + chday(dd).to_s
+  else
+    dd=day[2].to_i-1
+    return day[0].to_s + '-' + day[1].to_s + '-' + chday(dd).to_s
+  end
+end
+
 class Locate_events
   def initialize(today, inputdays)
     @today = today
@@ -225,6 +247,7 @@ class Locate_events
         i += 1
       end
     end
+    @num_i=i
     @num_i=@num_i-1
   end
 
@@ -276,8 +299,26 @@ end
     return overlap
   end
 
+  def null_sleep(sd,ed)
+    checkday=sd
+    decide_s_schedule(sd)
+    s_num=@num_i
+    decide_e_schedule(ed)
+    e_num=@num_i
+    #printf("sd%s, ed%s, s_num%s e_num%s\n", sd, ed, s_num, e_num)
+    for i in s_num..e_num
+      if @title[i]=="sleep"
+        #printf("test: sleep is %s\n", @s_day[i])
+        db = SQLite3::Database.new('scheduler.db')
+          db.execute('delete from schedule where id=?', @id[i])
+        db.close
+      end
+    end
+  end
+
   def sleep_t
-    day = @today
+    day = prevday(@today)
+    #printf("test: def sleep_t, dat=%s\n",day)
     db = SQLite3::Database.new('scheduler.db')
     db.results_as_hash = true
     db.execute('select * from person') do |row|
@@ -340,43 +381,9 @@ end
   	check_tasktime(@t_id[i])
   end
 
-  def null_sleep(sd,ed)
-  end
-
-  def null_task
-    #printf("test:[call null_task]!\n")
-    read_task
-    searchday=@today
-    decide_s_schedule(@today)
-    s=@num_i.to_i
-    db = SQLite3::Database.new('scheduler.db')
-      #printf("test:@s_name[%s]:%s\n", s, @title[s])
-    while s!=@num-1
-      #printf("test:@s_name[%s]:%s\n", s, @title[s])
-      if chint(searchday).to_i < chint(@e_day[s]).to_i
-        searchday=nextday(searchday)
-      end
-      if searchday==@s_day[s] && @st[s]!="s"
-        db.execute('delete from schedule where id=?', @id[s])
-        del_min=to_min(@e_time[s]).to_i-to_min(@s_time[s]).to_i
-        for i in 0.. @t_num-1
-          if @st[s]==@t_id[i]
-            id=i
-            break
-          end
-        end
-        #printf("test:%s del_min=%s, id=%s\n", @t_title[id], del_min, @t_id[id])
-        new_located=to_h(to_min(@l_tasktime[id]).to_i-del_min.to_i)
-        #printf("test:%s located=%s, id=%s\n", @t_title[id], new_located, @t_id[id])
-        db.execute('update task set located = ? where id=?', new_located, @t_id[id])
-        @l_tasktime[id]=new_located
-      end
-      s=s+1
-    end
-    db.close
-  end
 
   def task_add_time(s_time, e_time, b_time, task, c, inputday, i, flag)
+    #printf("L386: task(%s):%s\n",i, task)
     b_time = b_time.to_i-20
     if b_time.to_i<10
     elsif b_time.to_i>0
@@ -390,10 +397,12 @@ end
             new_tasktime=to_h(to_min(@tasktime[i]).to_i+add_time.to_i)
             @tasktime[i]=new_tasktime
             db = SQLite3::Database.new('scheduler.db')
-              db.execute('update task set t_time = ? where id=?', @tasktime, @t_id[i])
-              db.close
+              db.execute('update task set t_time = ? where id=?', @tasktime[i], @t_id[i])
+            db.close
+            task=@c_min[c].to_i
+            #printf("L403 new_task:%s\n",task)
               #ここまで、タスクがc_min以下だった場合タスク時間をc_minの差分分増やす
-        end
+          end
         if b_time.to_i >task.to_i
           ##printf("test: call392\n")
           if task.to_i > @c_max[c].to_i
@@ -442,6 +451,8 @@ end
 
 
   def put_task
+    read_schedule
+    read_task
     decide_s_schedule(@today)
     s=@num_i.to_i
   #  printf("call put_task\n")
@@ -475,7 +486,7 @@ end
         checkday=@today
         until checkday==endday
           #printf("test:checkyday=%s, %s:@e_day[s]=%s\n",checkday, @title[s],@e_day[s])
-          if $resttime==0
+          if $resttime<=0
             break;
           end
           #  printf("checkday : %s, endday : %s\n",checkday, endday)
@@ -501,8 +512,9 @@ end
                 s=s+1
               end
             else
+              #printf("test: L518//%s\n", @e_time[s])
               if to_min(@e_time[s]).to_i < to_min("12:00")
-                #タスクを配置する
+                s=s+1#タスクを配置する
               end
             end
           else
@@ -553,6 +565,44 @@ end
       #↑resttime!=0 end
     end
     #↑until i==@t_num end
+  end
+
+  def null_task
+    #printf("test:[call null_task]!\n")
+    read_task
+    searchday=@today
+    decide_s_schedule(@today)
+    s=@num_i.to_i
+    db = SQLite3::Database.new('scheduler.db')
+      #printf("test:@s_name[%s]:%s\n", s, @title[s])
+      #printf("@num-1=%s\n",@num-1)
+    while s!=@num-1
+      #printf("test:@s_name[%s]:%s\n", s, @title[s])
+      if chint(searchday).to_i < chint(@e_day[s]).to_i
+        searchday=nextday(searchday)
+      end
+      #printf("s=%s, com=%s searchday:%s, sday[s]:%s\n",s, @com[s], searchday, @s_day[s])
+      if searchday==@s_day[s] && @st[s]!="s" && @com[s]==0
+        #printf("delete %s(id:%s)\n",@title[s], @id[s])
+        db.execute('delete from schedule where id=?', @id[s])
+        del_min=to_min(@e_time[s]).to_i-to_min(@s_time[s]).to_i
+        for i in 0.. @t_num-1
+          if @st[s]==@t_id[i]
+            id=i
+            break
+          end
+        end
+        #printf("test:%s del_min=%s, id=%s\n", @t_title[id], del_min, @t_id[id])
+        new_located=to_h(to_min(@l_tasktime[id]).to_i-del_min.to_i)
+        #printf("test:%s located=%s, id=%s\n", @t_title[id], new_located, @t_id[id])
+        db.execute('update task set located = ? where id=?', new_located, @t_id[id])
+        @l_tasktime[id]=new_located
+        #printf("@l_tasktime[%s]:%s\n",id, @l_tasktime[id])
+      end
+      s=s+1
+    end
+    db.close
+    put_task
   end
 
   def view_event
@@ -681,14 +731,13 @@ for n in 0..365
 end
 
 event = Locate_events.new(today, inputdays)
-#event.sleep_t
+event.decide_s_schedule(today)
+event.sleep_t
 for i in 0..2
 #  event.eating_t(eat_st[i], eat_et[i])
 end
-event.decide_s_schedule(today)
 # event.overlap_event("2015-11-04", "2015-11-04", "15:00", "17:00")
 event.null_task
-event.put_task
 
 event.view_event
 print_t('js2.txt')
