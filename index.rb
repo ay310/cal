@@ -267,9 +267,9 @@ end
   def search_same(name, sd, st, ed, et)
     decide_s_schedule(@today)
     overlap = 0
-    #printf("search_same:@num_i=%s",@num_i)
+    #printf("test: search_same:@num_i=%s",@num_i)
     for i in@num_i.to_i..@num.to_i
-      #printf("件名%s...開始%s,終了%s\n", @title[i],@s_day[i],@e_day[i])
+      #printf("test: 件名%s...開始%s,終了%s\n", @title[i],@s_day[i],@e_day[i])
       if @title[i] == name && @s_day[i] == sd && @s_time[i] == st && @e_day[i] == ed && @e_time[i] == et
         overlap = 1
         break
@@ -305,7 +305,7 @@ end
     s_num=@num_i
     decide_e_schedule(ed)
     e_num=@num_i
-    #printf("sd%s, ed%s, s_num%s e_num%s\n", sd, ed, s_num, e_num)
+    #printf("test: sd%s, ed%s, s_num%s e_num%s\n", sd, ed, s_num, e_num)
     for i in s_num..e_num
       if @title[i]=="sleep"
         #printf("test: sleep is %s\n", @s_day[i])
@@ -365,9 +365,9 @@ end
   end
 
   def add_db_task(i, inputday, st, et)
-    ##printf("test: !!call add_db_task (%s, %s, %s, %s)\n", i, inputday, st, et)
+    #printf("test: !!call add_db_task (%s, %s, %s, %s)\n", i, inputday, st, et)
     #p num
-    #printf("i:%s, s:%s, st:%s, et:%s\n", i, s, st, et)
+    #printf("test: i:%s, s:%s, st:%s, et:%s\n", i, s, st, et)
   	db = SQLite3::Database.new('scheduler.db')
   	db.execute('insert into schedule  (title, s_day, s_time, e_day, e_time, category, st, completed) values(?, ?, ?, ?, ?, ?, ?, ?)', @t_title[i], inputday, st, inputday, et, @t_category[i], @t_id[i], '0')
     if @l_tasktime[i]=="00:00"
@@ -383,7 +383,7 @@ end
 
 
   def task_add_time(s_time, e_time, b_time, task, c, inputday, i, flag)
-    #printf("L386: task(%s):%s\n",i, task)
+    #printf("test: L386: task(%s):%s, b_time is %s,  c is %s\n",i, task, b_time, c)
     b_time = b_time.to_i-20
     if b_time.to_i<10
     elsif b_time.to_i>0
@@ -400,22 +400,22 @@ end
               db.execute('update task set t_time = ? where id=?', @tasktime[i], @t_id[i])
             db.close
             task=@c_min[c].to_i
-            #printf("L403 new_task:%s\n",task)
+            #printf("test: L403 new_task:%s\n",task)
               #ここまで、タスクがc_min以下だった場合タスク時間をc_minの差分分増やす
           end
         if b_time.to_i >task.to_i
-          ##printf("test: call392\n")
+          #printf("test: call392 c_max is %s\n",@c_max[c])
           if task.to_i > @c_max[c].to_i
-          ##printf("test: call394n")
+          #printf("test: call394n")
             #ad c_max
             st=to_h(to_min(e_time).to_i+10)
             et=to_h(to_min(st).to_i+@c_max[c].to_i)
             add_db_task(i, inputday, st, et)
-          elsif task.to_i < @c_max[c].to_i
+          elsif task.to_i <= @c_max[c].to_i
             #ad task
             st=to_h(to_min(e_time).to_i+10)
             et=to_h(to_min(st).to_i+task.to_i)
-            ##printf("test: call403\n")
+            #printf("test: call403\n")
             add_db_task(i, inputday, st, et)
           end
         else
@@ -423,13 +423,13 @@ end
             #ad c_mac
             st=to_h(to_min(e_time).to_i+10)
             et=to_h(to_min(st).to_i+@c_max[c].to_i)
-            ##printf("test: call411\n")
+            #printf("test: call411\n")
             add_db_task(i, inputday, st, et)
           elsif b_time.to_i < @c_max[c].to_i
             #ad b_time
             st=to_h(to_min(e_time).to_i+10)
             et=to_h(to_min(st).to_i+b_time.to_i)
-            ##printf("test: call417(st:%s, et%s, b_time:%s)\n", st, et, b_time)
+            #printf("test: call417(st:%s, et%s, b_time:%s)\n", st, et, b_time)
             add_db_task(i, inputday, st, et)
           end
         end
@@ -468,8 +468,8 @@ end
     i=0
   #  printf("t_num:%s\n",@t_num)
     until i==@t_num
-      #printf("test:L448 iは%s, %s\n", i, @num)
       check_tasktime(@t_id[i])
+      #printf("test:L472 iは%s,　resttimeは%s\n", i, $resttime)
       #タスクの残り作業時刻の計測
       #$resttimeが変数
       if $resttime!=0
@@ -487,20 +487,21 @@ end
         until checkday==endday
           #printf("test:checkyday=%s, %s:@e_day[s]=%s\n",checkday, @title[s],@e_day[s])
           if $resttime<=0
+            #printf("test: break %s\n", i)
             break;
           end
           #  printf("checkday : %s, endday : %s\n",checkday, endday)
           while chint(checkday).to_i>chint(@e_day[s]).to_i
             s=s+1
           end
-          #printf("%s, %s\n",@e_day[s], @s_day[s+1])
+          #printf("test: %s, %s\n",@e_day[s], @s_day[s+1])
           if checkday==@e_day[s]
             #指定日に予定がある
             if @e_day[s]==@s_day[s+1]
               #その次の予定も同日である
               if @category[s]==@c_name[c]
                 b_time=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
-                #printf("b_time is %s\n", b_time)
+                #printf("test: b_time is %s\n", b_time)
                 task_add_time(@s_time[s+1], @e_time[s], b_time,$resttime, c, checkday, i, "0")
                 s=s+1
               elsif @category[s]==nil
@@ -526,11 +527,14 @@ end
         end
         #checkdayが締め切りになるまで
         if $resttime!=0
+          #printf("test 530/call not_same_category:%s\n",i)
           #以下、カテゴリどうし近しいものが無かった場合強制的に追加
           checkday=@today
           decide_s_schedule(@today)
           s=@num_i.to_i
+            #printf("test: L536/ endday=%s\n", endday)
           until checkday==endday
+            #printf("test: L536/ checkday=%s\n", checkday)
             if $resttime==0
               break;
             end
@@ -575,15 +579,15 @@ end
     s=@num_i.to_i
     db = SQLite3::Database.new('scheduler.db')
       #printf("test:@s_name[%s]:%s\n", s, @title[s])
-      #printf("@num-1=%s\n",@num-1)
+      #printf("test: @num-1=%s\n",@num-1)
     while s!=@num-1
       #printf("test:@s_name[%s]:%s\n", s, @title[s])
       if chint(searchday).to_i < chint(@e_day[s]).to_i
         searchday=nextday(searchday)
       end
-      #printf("s=%s, com=%s searchday:%s, sday[s]:%s\n",s, @com[s], searchday, @s_day[s])
+      #printf("test: s=%s, com=%s searchday:%s, sday[s]:%s\n",s, @com[s], searchday, @s_day[s])
       if searchday==@s_day[s] && @st[s]!="s" && @com[s]==0
-        #printf("delete %s(id:%s)\n",@title[s], @id[s])
+        #printf("test: delete %s(id:%s)\n",@title[s], @id[s])
         db.execute('delete from schedule where id=?', @id[s])
         del_min=to_min(@e_time[s]).to_i-to_min(@s_time[s]).to_i
         for i in 0.. @t_num-1
@@ -597,7 +601,7 @@ end
         #printf("test:%s located=%s, id=%s\n", @t_title[id], new_located, @t_id[id])
         db.execute('update task set located = ? where id=?', new_located, @t_id[id])
         @l_tasktime[id]=new_located
-        #printf("@l_tasktime[%s]:%s\n",id, @l_tasktime[id])
+        #printf("test: @l_tasktime[%s]:%s\n",id, @l_tasktime[id])
       end
       s=s+1
     end
