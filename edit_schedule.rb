@@ -42,6 +42,10 @@ end
 if $st != 's'
   # カレンダーからタスクが選択された時
   print_t('calendar_task1.txt')
+  printf("value: 37,\n")
+  printf("min: 1,\n")
+  printf("max: 100,\n")
+  print_t('calendar_task2.txt')
   print "<form action=\"/cgi-bin/cal/add_task.rb"
   print "\" method=\"post\">\n "
   print "<input type=\"hidden\" name=\"s_id\" value=\""
@@ -69,6 +73,11 @@ if $st != 's'
   print "  <input id=\"cale_time\" type=\"text\" name=\"cale_time\" value=\""
   print $e_time
   print "\">\n"
+  print ' <p>'
+  print ' <label for="amount">全体の進捗状況を入力:</label>'
+  print '   <input type="text" id="amount" style="border: 0; color: #f6931f; font-weight: bold;" />'
+  print ' </p>'
+  print ' <div id="slider-range-min"></div>'
   print '  <p><label>メモ</label></p>'
   print "\n"
   print " <textarea rows=\"3\" name=\"memo"
@@ -97,7 +106,7 @@ if $st != 's'
   print "',"
   print	"format:'Y-m-d',"
   print "formatDate:'Y/m/d',});"
-  print_t('calendar_task2.txt')
+  print_t('calendar_task3.txt')
 elsif $st == 's'
   # スケジュールをクリックした時
   print '<!DOCTYPE html>' + "\n"

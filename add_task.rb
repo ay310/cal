@@ -192,6 +192,9 @@ def task_scheduler(cal_t_id, cal_s_id, cal_st, cal_et, cal_plan_st, cal_plan_et)
     $located_time = row[9]
     $log = row[10]
   end
+  db.execute('select * from par') do |row|
+    $per = row[0]
+  end
   db.execute('update schedule set s_time=?  where id=?', cal_st, cal_s_id)
   db.execute('update schedule set e_time=?  where id=?', cal_et, cal_s_id)
   plan_tasktime = to_h(to_min(cal_plan_et).to_i - to_min(cal_plan_st).to_i)
@@ -207,11 +210,17 @@ def task_scheduler(cal_t_id, cal_s_id, cal_st, cal_et, cal_plan_st, cal_plan_et)
   else
     new_log = $log.to_s+","+to_min(completed_time).to_s+"(".to_s+plan.to_s+")".to_s
   end
+  #以下％からタスク時刻を再度決める
+  task_time= (100/$per.to_i)*to_min(tt).to_i
+
+  task_time=to_h(task_time).to_s
+    printf("task_time is %s. tt is %s\n", task_time, tt)
   db.execute('update task set log =?  where id=?', new_log, cal_t_id)
   db.execute('update task set time =?  where id=?', tt, cal_t_id)
+    db.execute('update task set t_time =?  where id=?', task_time, cal_t_id)
   db.close
-  #print '<html>'
-  #print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
+  print '<html>'
+  print '<head><META http-equiv="refresh"; content="0; URL=/cgi-bin/cal/index.rb"></head><body></body></html>'
 end
 
 if cal_t_id != '' && cal_s_id != ''

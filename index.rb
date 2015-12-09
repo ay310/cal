@@ -300,8 +300,8 @@ end
   end
 
   def null_sleep(sd,ed)
-    checkday=sd
-    decide_s_schedule(sd)
+    checkday=nextday(sd)
+    decide_s_schedule(checkday)
     s_num=@num_i
     decide_e_schedule(ed)
     e_num=@num_i

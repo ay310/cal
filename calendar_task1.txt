@@ -14,7 +14,10 @@ document.form1.completed.value = place;
 document.form1.submit();
 }
 </script>
-</head>
-<body>
-<div id="layout"><div id="content">
-<div align="center"><p>タスクの進捗管理</p></div>
+<link rel="stylesheet" href="http://code.jquery.com/ui/1.9.2/themes/base/jquery-ui.css" />
+<script src="http://code.jquery.com/ui/1.9.2/jquery-ui.js"></script>
+<link rel="stylesheet" href="/resources/demos/style.css" />
+<script>
+$(function() {
+  $( "#slider-range-min" ).slider({
+    range: "min",
