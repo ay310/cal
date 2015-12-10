@@ -1,4 +1,4 @@
-</body>
+</div></body>
 <script>
 $.datetimepicker.setLocale('ja');
 $('#datetimepicker_format').datetimepicker({value:'2015/04/15 05:03', format: $("#datetimepicker_format_value").val()});

@@ -8,6 +8,11 @@ print "Content-type: text/html\n\n"
 c_name = data['c_name'].to_s.toutf8
 edit_taskid = data['taskid'].to_s.toutf8
 
+#カテゴリ編集数値入力後、受け取る変数
+edit_id = data['c_id'].to_s.toutf8
+edit_min = data['min_time'].to_s.toutf8
+edit_max = data['max_time'].to_s.toutf8
+
 def to_min(time)
   if time == "00:00"
     return 0
@@ -53,7 +58,8 @@ pc = Array.new(num)
 min = Array.new(num)
 max = Array.new(num)
 i = 0
-print "<div id=\"layout\">"
+print "<div id=\"layout\"><div id=\"content\">\n"
+printf("<h1>カテゴリ編集</h1><hr>\n")
 db.execute('select * from category') do |row|
   name[i] = row[0]
   s[i] = row[1]
@@ -65,30 +71,29 @@ db.execute('select * from category') do |row|
   min[i] = row[8]
   i += 1
 end
-if edit_taskid.to_s==""
-  if c_name==""
+if edit_taskid.to_s=="" && edit_id.to_s==""
     #表示画面
     print "<FORM name=\"form1\" action=\"edit_category.rb\" onSubmit=\"return false\">\n"
     print"<p><input type=\"hidden\" name=\"taskid\" value=\"\">\n"
     for i in 1..num-1
       print "<input type=\"radio\" onClick=\"mySubmit('"
       print  i
-      print "')\">"
+      print "')\"><u>"
       print name[i]
+      printf("</u>：連続作業可能時間：%s 〜%s", to_h(min[i].to_i), to_h(max[i].to_i))
       print"</p>\n"
     end
     print "<div id = \"buttom\" align=\"right\" style=\"clear:both;\"></div></form></div>"
-  else
-    #編集画面
-    print "</body>"
-  end
-else
+elsif edit_taskid.to_s!=""
   #もしedit_tasknameが空白じゃなかったら、編集画面を出力する
   id=edit_taskid.to_i
   print "<form action=\"/cgi-bin/cal/edit_category.rb\" method=\"post\">"
-  printf("<label>カテゴリ名：")
+  print "<input type=\"hidden\" name=\"c_id\" value=\""
+  print id
+  print "\">\n"
+  printf("<label>カテゴリ名：<u>")
   print name[id.to_i]
-  printf("</label><br>")
+  printf("</u></label><br>\n")
   printf("作業可能最小時刻\n")
   print "  <input id=\"min_time\" type=\"text\" name=\"min_time\" value=\""
   print to_h(min[id.to_i])
@@ -98,7 +103,7 @@ else
   print to_h(max[id.to_i])
   print "\"><br>\n"
   printf("ロケーション指定\n")
-  print "<p><input type=\"submit\" value=\"送信\"  onclick=\"window.close()\" class=\"btn\"></p>"
+  print "<p><input type=\"submit\" value=\"変更\"  onclick=\"window.close()\" class=\"btn\"></p>"
   print '</form>'
 
   print_t("edit_category3.txt")
@@ -116,6 +121,26 @@ else
   print to_h(max[id])
   print "',\n step:5\n});\n"
   print "</script>\n"
-    end
+elsif edit_id.to_s!=""
+  #dbに編集後の時間を書き換える
+  db = SQLite3::Database.new('scheduler.db')
+  e_min=to_min(edit_min)
+  e_max=to_min(edit_max)
+    db.execute('update category set min =?  where name=?', e_min, name[edit_id.to_i])
+    db.execute('update category set max =?  where name=?', e_max, name[edit_id.to_i])
+  db.close
+  printf("<label>カテゴリ名：<u>")
+  print name[id.to_i]
+  print "</u><br>"
+  printf("作業可能最小時刻\n")
+  printf edit_min
+  print "<br>"
+  printf("\n作業可能最大時刻\n")
+  printf edit_max
+    print "<br>"
+    printf("\nに変更しました！\n")
+        print "<br>"
+    printf("<a href=\"edit_category.rb\">もどる</a>\n")
+end
 print_t('edit_category5.txt')
 db.close

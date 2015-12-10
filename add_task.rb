@@ -195,6 +195,7 @@ def task_scheduler(cal_t_id, cal_s_id, cal_st, cal_et, cal_plan_st, cal_plan_et)
   db.execute('select * from par') do |row|
     $per = row[0]
   end
+  db.execute('update task set per=?  where id=?', $per, cal_t_id)
   db.execute('update schedule set s_time=?  where id=?', cal_st, cal_s_id)
   db.execute('update schedule set e_time=?  where id=?', cal_et, cal_s_id)
   plan_tasktime = to_h(to_min(cal_plan_et).to_i - to_min(cal_plan_st).to_i)

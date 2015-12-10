@@ -41,8 +41,11 @@ end
 
 if $st != 's'
   # カレンダーからタスクが選択された時
+  db.execute('select * from task where id=?', $st) do |row|
+    $per = row[11]
+  end
   print_t('calendar_task1.txt')
-  printf("value: 37,\n")
+  printf("value: %s,\n",$per.to_i)
   printf("min: 1,\n")
   printf("max: 100,\n")
   print_t('calendar_task2.txt')

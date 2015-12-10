@@ -4,11 +4,19 @@ body {
   background-color: #3a87ad;
   font-family: , Meiryo, serif;
 }
+
+hr{
+    border:none;
+    border-top:dashed 1px #3a87ad;
+    height:1px;
+    color:#FFFFFF;
+    margin: 0 6 0 6;
+}
+
 #layout {
 	border-radius: 10px;
   text-align: left;
   width: 540px;
-	height: 440px;
   background-color: #fff;
   color: #4d453d;
   margin-top: 160px;
@@ -22,10 +30,11 @@ body {
   color: #4d453d;
   font-family: , Meiryo, serif;
  font-size: 14px;
-	width: 500px;
-	height: 400px;
-	margin: 20px 20px 20px 20px;
+ line-height: 200%;
+	margin: 40px 40px 40px 40px;
 }
+
+
 
 }
 #allday {
