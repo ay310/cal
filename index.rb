@@ -383,7 +383,7 @@ end
 
 
   def task_add_time(s_time, e_time, b_time, task, c, inputday, i, flag)
-    #printf("test: L386: task(%s):%s, b_time is %s,  c is %s\n",i, task, b_time, c)
+    #printf("test: L386: %s(%s):%s, b_time is %s,  c is %s\n",@t_title[i].to_s, i, task, b_time, c)
     b_time = b_time.to_i-20
     if b_time.to_i<10
     elsif b_time.to_i>0
@@ -472,6 +472,7 @@ end
       #printf("test:L472 iは%s,　resttimeは%s\n", i, $resttime)
       #タスクの残り作業時刻の計測
       #$resttimeが変数
+      #printf("%s i:%s, 残作業時刻は%s\n", @t_title[i], i, $resttime)
       if $resttime!=0
         endday=@te_day[i]
         for j in 0.. @c_num.to_i-1
@@ -484,8 +485,23 @@ end
         end
         #↑カテゴリ検索end
         checkday=@today
-        until checkday==endday
-          #printf("test:checkyday=%s, %s:@e_day[s]=%s\n",checkday, @title[s],@e_day[s])
+        #printf("test:checkday=%s\n", checkday)
+        if prevday(checkday)==endday && $resttime>0
+          #開いた当日が締切日の場合
+          #printf("L490 開いた当日が締切日の場合\n")
+          for i in 0..@num.to_i-1
+            if endday==@e_day[i]
+              s=i
+              break
+            end
+          end
+          if @e_day[s]==@s_day[s+1]
+            b_time=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
+            task_add_time(@s_time[s+1], @e_time[s], b_time,$resttime, c, endday, i, "0")
+          end
+        end
+        until chint(checkday)>chint(endday)
+          #printf("(%s:%s) test:checkyday=%s, %s:@e_day[s]=%s\n", i, @t_title[i],  checkday, @title[s],@e_day[s])
           if $resttime<=0
             #printf("test: break %s\n", i)
             break;
@@ -501,12 +517,12 @@ end
               #その次の予定も同日である
               if @category[s]==@c_name[c]
                 b_time=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
-                #printf("test: b_time is %s\n", b_time)
+                #printf("519 / test: b_time is %s\n", b_time)
                 task_add_time(@s_time[s+1], @e_time[s], b_time,$resttime, c, checkday, i, "0")
                 s=s+1
               elsif @category[s]==nil
                 b_time=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
-              #  printf("b_time is %s\n", b_time)
+                #printf("524 / b_time is %s\n", b_time)
                 task_add_time(@s_time[s+1], @e_time[s], b_time, $resttime, c, checkday, i, "0")
                 s=s+1
               else
@@ -533,7 +549,7 @@ end
           decide_s_schedule(@today)
           s=@num_i.to_i
             #printf("test: L536/ endday=%s\n", endday)
-          until checkday==endday
+          until chint(checkday)>chint(endday)
             #printf("test: L536/ checkday=%s\n", checkday)
             if $resttime==0
               break;
@@ -547,6 +563,7 @@ end
             if checkday==@e_day[s]
               if @e_day[s]==@s_day[s+1]
                 b_time=to_min(@s_time[s+1]).to_i-to_min(@e_time[s]).to_i
+                #printf("565 / b_time is %s\n", b_time)
                 task_add_time(@s_time[s+1], @e_time[s], b_time, $resttime, c, checkday, i, s)
                 s=s+1
               else
@@ -576,7 +593,7 @@ end
     read_task
     searchday=@today
     decide_s_schedule(@today)
-    s=@num_i.to_i
+    s=0
     db = SQLite3::Database.new('scheduler.db')
       #printf("test:@s_name[%s]:%s\n", s, @title[s])
       #printf("test: @num-1=%s\n",@num-1)
@@ -586,7 +603,8 @@ end
         searchday=nextday(searchday)
       end
       #printf("test: s=%s, com=%s searchday:%s, sday[s]:%s\n",s, @com[s], searchday, @s_day[s])
-      if searchday==@s_day[s] && @st[s]!="s" && @com[s]==0
+      #printf("test: prevday=%s\n", prevday(@today))
+      if prevday(@today)!=@s_day[s] && @com[s]==0
         #printf("test: delete %s(id:%s)\n",@title[s], @id[s])
         db.execute('delete from schedule where id=?', @id[s])
         del_min=to_min(@e_time[s]).to_i-to_min(@s_time[s]).to_i
@@ -650,15 +668,15 @@ end
   def view_taskmenu
     read_task
     print_t('body1.txt')
-    printf("<p><a href=\"feedback.rb\">振り返り</a></p>\n")
+    printf("<p><a href=\"feedback.rb\"><b>振り返る</b></a></p>\n")
     print "<p>現在地は"
     print read_location.to_s
-    print "です</p>\n"
-    print "<p>→<a href=\"add_location.rb\" alt=\"タスクの入力\">現在地の入力</a></p>\n"
-    print " <p><a href=\"new_schedule.rb\">スケジュールの新規作成</a></p>\n"
-    print "<p><a href=\"in_task.rb\" alt=\"タスクの入力\">タスクの新規作成</a></p>\n"
-    print "<p><a href=\"edit_category.rb\">カテゴリの編集</a></p>\n"
-    print "<p><a href=\"personal.rb\" alt=\"個人情報の編集\">個人情報の編集</a></p>\n"
+    print "です\n"
+    print "→<a href=\"add_location.rb\" alt=\"タスクの入力\">現在地の入力</a></p>\n"
+    print " <p>新規作成：<a href=\"new_schedule.rb\">スケジュール</a> / \n"
+    print "<a href=\"in_task.rb\" alt=\"タスクの入力\">タスク</a></p>\n"
+    print "<p>編集：<a href=\"edit_category.rb\">カテゴリ</a> / \n"
+    print "<a href=\"personal.rb\" alt=\"個人情報の編集\">個人情報</a></p>\n"
     print "</div><br>\n"
     print "<b>||| Task</b><div class='box-lid-menulist'>\n"
     print "<FORM name=\"form1\" action=\"edit_task.rb\" onSubmit=\"return false\">\n"
